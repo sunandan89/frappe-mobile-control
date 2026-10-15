@@ -320,6 +320,35 @@ Each example stores a `curl_command` rendered from its method, URL, and payload.
 Rows are purged daily by `mobile_control.tasks.purge_mobile_error_logs`. Retention is configurable on **Mobile Configuration** via `mobile_error_log_retention_days` (default **30**); rows older than that are deleted.
 
 
+### Personal Fields (encrypted at rest)
+
+Opt-in. Nothing changes until you add a row under **Mobile Configuration → Personal Fields**.
+
+Use it for fields holding beneficiaries' personal data, such as names and phone numbers, that must stay encrypted in the database and still sync to the mobile app.
+
+Each row (child DocType **Mobile Personal Field**) names:
+
+| Field | Meaning |
+|-------|---------|
+| `doctype_name` | The DocType. It must also be listed under Forms Configuration, and it can't be a child or Single DocType. |
+| `fieldname` | A **Small Text**, **Text** or **Long Text** field. |
+| `roles_allowed` | One role per line. Users with any of these roles get the clear value. Leave it blank to give it to anyone who can read the document. |
+
+**Why not Data fields?** An encrypted value is the Fernet token plus the `enc:v1:` prefix: 107 characters for a short name, and more than 140 once the value is 32 bytes or longer. An 11-letter name in Devanagari is already that long. A Data column is `varchar(140)`. Raising its length would mean an `ALTER TABLE` on live tables, and Phone/Email validation on Data fields would still reject the ciphertext. Text columns have neither problem. To convert a field, change it from Data to Small Text in Customize Form (Frappe allows this change), then add the row.
+
+What happens:
+
+- **At rest.** Before every save, configured fields are encrypted with the site key and stored as `enc:v1:<token>`. A hidden, indexed custom field `<fieldname>_hash`, added when you save the configuration, holds a keyed HMAC-SHA256 of the value after trimming, collapsing spaces and folding case. This supports exact-match search. Saving is idempotent: values that are already encrypted are left alone, and re-saving an unchanged value keeps its token. Values saved before the field was configured are encrypted by a background job when you save the configuration.
+- **Over the sync API.** `mobile_sync.get_docs_with_children` returns clear values to users with a role in `roles_allowed`. Everyone else gets `null`. The `_hash` field is always returned as `null`. Each response that carries clear values writes one **Access Log** entry: the DocType, the method, the field names and a document count. Values are never logged.
+- **Desk.** Opening the form shows the clear value to permitted users and a blank field to others. If a user without access saves the form with the field blank, the stored value is kept, so they can't wipe data they never saw. They can still enter a new value.
+- **Configuration.** `mobile_auth.configuration` lists the fields per form as `"personal_fields": ["full_name", ...]`, an empty list when there are none. The SDK uses this list to pull those DocTypes through `get_docs_with_children`.
+- **Search.** `mobile_sync.find_by_personal_value(doctype, fieldname, value)` returns the names of matching documents (at most 100). The caller needs read permission and one of the field's `roles_allowed`. Normal list permissions apply.
+
+The hash salt defaults to the site `encryption_key`. You can set a dedicated salt in `site_config.json` as `mobile_control_personal_field_salt`. Changing either one invalidates stored hashes, and changing `encryption_key` makes stored values unreadable.
+
+Limitations: `frappe.client.get_list`, `/api/resource`, list and report views, and exports return the ciphertext. Writes that skip document hooks (`db_set`, `frappe.db.set_value`, raw SQL) store clear text. Server-side Phone/Email format validation no longer applies to these fields. Use an SDK release that reads `personal_fields` before you enable this. Older SDKs pull DocTypes without child tables through `get_list` and would show ciphertext.
+
+
 ### Contributing
 
 This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:
