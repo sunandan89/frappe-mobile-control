@@ -34,6 +34,7 @@ from typing import Any
 
 import frappe
 from frappe import _
+from mobile_control.personal_fields import reveal_rows
 
 # Hard cap to bound server work / response payload. The SDK chunks
 # larger lists client-side; keep this in sync with the constant in
@@ -144,5 +145,11 @@ def get_docs_with_children(doctype: str, names: Any) -> list[dict[str, Any]]:
 		# rows as nested lists of dicts — same shape as
 		# `/api/resource/<doctype>/<name>`.
 		out.append(doc.as_dict())
+
+	# Personal fields (Mobile Configuration -> Personal Fields) are stored
+	# encrypted. Clear values for users in the field's `roles_allowed`,
+	# blank for everyone else; one Access Log entry when anything clear is
+	# returned. No-op for doctypes without personal fields.
+	reveal_rows(doctype, out, method="mobile_sync.get_docs_with_children")
 
 	return out

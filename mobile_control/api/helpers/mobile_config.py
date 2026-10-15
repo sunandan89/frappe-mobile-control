@@ -10,6 +10,9 @@ def get_mobile_configuration_payload() -> dict[str, Any]:
 	try:
 		config = frappe.get_single("Mobile Configuration")
 		configuration: list[dict[str, Any]] = []
+		personal_fields: dict[str, list[str]] = {}
+		for row in config.get("personal_fields") or []:
+			personal_fields.setdefault(row.doctype_name, []).append(row.fieldname)
 		if config.table_lwis:
 			for row in config.table_lwis:
 				configuration.append(
@@ -19,6 +22,11 @@ def get_mobile_configuration_payload() -> dict[str, Any]:
 						"doctype_meta_modified_at": row.doctype_meta_modified_at or "",
 						"doctype_icon": row.doctype_icon or "",
 						"order": row.order or 0,
+						# Fields stored encrypted on the server. The SDK pulls
+						# these doctypes via mobile_sync.get_docs_with_children
+						# (which returns clear values to permitted roles) and
+						# keeps them locally only when the app opts in.
+						"personal_fields": personal_fields.get(row.mobile_workspace_item, []),
 					}
 				)
 		enabled = bool(config.enabled)
