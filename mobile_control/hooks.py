@@ -150,9 +150,18 @@ doc_events = {
 	# doctype). Walks the parent + child tables and rewires SDK-uploaded
 	# File rows (uploaded with dt=<doctype>, dn=NULL) to point at their
 	# real (doctype, name) once the parent INSERT/UPDATE commits.
+	#
+	# Personal fields — encrypt configured fields before every save and
+	# reveal them on Desk form load to permitted roles. Both fast-exit when
+	# the doctype has no row under Mobile Configuration -> Personal Fields
+	# (config is cached; one dict lookup per save).
 	"*": {
 		"on_update": "mobile_control.attachment_relink.relink_mobile_files",
 		"on_update_after_submit": "mobile_control.attachment_relink.relink_mobile_files",
+		"before_save": "mobile_control.personal_fields.encrypt_personal_fields",
+		"before_submit": "mobile_control.personal_fields.encrypt_personal_fields",
+		"before_update_after_submit": "mobile_control.personal_fields.encrypt_personal_fields",
+		"onload": "mobile_control.personal_fields.reveal_on_form_load",
 	},
 	"DocType": {
 		"on_update": "mobile_control.mobile_control.doctype.mobile_configuration.mobile_configuration.update_doctype_meta_modified",
@@ -203,6 +212,7 @@ override_whitelisted_methods = {
 	"mobile_sync.sync_details": "mobile_control.api.sync_details.get_sync_details",
 	"mobile_sync.get_translations": "mobile_control.api.translations.get_translations",
 	"mobile_sync.report_error": "mobile_control.api.error_log.report_error",
+	"mobile_sync.find_by_personal_value": "mobile_control.personal_fields.find_by_personal_value",
 }
 #
 # each overriding function accepts a `data` argument;

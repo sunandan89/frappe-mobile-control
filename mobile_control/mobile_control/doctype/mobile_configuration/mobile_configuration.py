@@ -4,11 +4,43 @@
 import frappe
 from frappe.model.document import Document
 from frappe.utils import now_datetime
+from mobile_control import personal_fields
 
 
 class MobileConfiguration(Document):
+	def validate(self) -> None:
+		configured = {
+			row.mobile_workspace_item for row in (self.table_lwis or []) if row.mobile_workspace_item
+		}
+		personal_fields.validate_rows(self.get("personal_fields") or [], configured)
+
 	def on_update(self) -> None:
 		_ensure_mobile_uuid_fields(self)
+		_ensure_personal_fields(self)
+
+
+def _ensure_personal_fields(config: "MobileConfiguration") -> None:
+	"""Adds `<field>_hash` columns, drops the cached config, and encrypts
+	values stored before a field was configured (background job)."""
+	personal_fields.clear_personal_field_cache()
+	before = config.get_doc_before_save()
+	previous = (
+		{(row.doctype_name, row.fieldname) for row in (before.get("personal_fields") or [])}
+		if before
+		else set()
+	)
+	for row in config.get("personal_fields") or []:
+		personal_fields.ensure_hash_field(row.doctype_name, row.fieldname)
+		if (row.doctype_name, row.fieldname) in previous:
+			continue
+		frappe.enqueue(
+			"mobile_control.personal_fields.encrypt_existing_values",
+			queue="long",
+			doctype=row.doctype_name,
+			fieldname=row.fieldname,
+			enqueue_after_commit=True,
+			now=bool(frappe.flags.in_test),
+		)
 
 
 def _ensure_mobile_uuid_fields(config: "MobileConfiguration") -> None:

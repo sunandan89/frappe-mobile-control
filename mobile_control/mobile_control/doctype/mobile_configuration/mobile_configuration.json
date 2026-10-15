@@ -16,7 +16,9 @@
   "maintenance_message",
   "forms_configuration_section",
   "table_lwis",
-  "mobile_error_log_retention_days"
+  "mobile_error_log_retention_days",
+  "personal_fields_section",
+  "personal_fields"
  ],
  "fields": [
   {
@@ -87,6 +89,19 @@
    "fieldtype": "Int",
    "label": "Mobile Error Log Retention (days)",
    "description": "Mobile Error Log rows older than this are purged daily. 0 disables purging."
+  },
+  {
+   "collapsible": 1,
+   "description": "Fields holding personal data (names, phone numbers). Values are encrypted at rest and returned in clear over the mobile sync API only to the roles listed. Off unless rows are added here.",
+   "fieldname": "personal_fields_section",
+   "fieldtype": "Section Break",
+   "label": "Personal Fields"
+  },
+  {
+   "fieldname": "personal_fields",
+   "fieldtype": "Table",
+   "label": "Personal Fields",
+   "options": "Mobile Personal Field"
   }
  ],
  "grid_page_length": 50,
@@ -94,7 +109,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-03 18:51:18.432016",
+ "modified": "2026-10-15 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mobile Control",
  "name": "Mobile Configuration",
